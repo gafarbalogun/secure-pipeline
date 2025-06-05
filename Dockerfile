@@ -1,25 +1,37 @@
-#  Python slim image
-FROM python:3.9-slim-bullseye
+# Start with Python slim image
+FROM python:3.9-slim-bullseye AS builder
 
-#  Working directory
+# Set working directory
 WORKDIR /app
 
-# Application dependencies
+# Install Bandit (Python security tool)
+RUN pip install --no-cache-dir bandit
+
+# Copy Bandit configuration into the container
+COPY .bandit.yml /app/.bandit.yml
+
+# Copy requirements first
 COPY app/requirements.txt .
 
-# Installing dependencies 
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application files
+# Create non-root user
+RUN groupadd -r appuser && \
+    useradd -r -g appuser appuser
+
+# Copy application code
 COPY app/ .
 
-# Creating a non root user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+# Now create the reports directory and set correct permissions
+RUN mkdir -p /reports && chown appuser:appuser /reports
+
+# Switching to non-root user (AFTER installing security tools & setting permissions)
 USER appuser
 
-# Expose Flask's default port
+# Flask application port
 EXPOSE 5000
 
-# Start the Flask app using Gunicorn
+# Runs the application
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
 
